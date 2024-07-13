@@ -231,11 +231,11 @@ public class MainClassI
 
 	public static void Compress(FileStream rfs, FileStream wfs)
 	{
-		using var image = Image.Load<Bgra32>(rfs);
+		using var image = Image.Load<Rgba32>(rfs);
 		var bytes = new byte[rfs.Length];
 		rfs.Position = 0;
 		rfs.Read(bytes);
-		var s = Executions.Encode(image, bytes);
+		var s = ExecutionsI.Encode(image, bytes);
 		wfs.Write(s);
 		//if (continue_)
 		//{

@@ -68,19 +68,19 @@ public static partial class Global
 #pragma warning disable CS0652 // Сравнение с константой интеграции бесполезно: константа находится за пределами диапазона типа
 	public static int BWTBlockExtraSize => BWTBlockSize <= 0x4000 ? 2 : BWTBlockSize <= 0x400000 ? 3 : BWTBlockSize <= 0x40000000 ? 4 : BWTBlockSize <= 0x4000000000 ? 5 : BWTBlockSize <= 0x400000000000 ? 6 : BWTBlockSize <= 0x40000000000000 ? 7 : 8;
 #pragma warning restore CS0652 // Сравнение с константой интеграции бесполезно: константа находится за пределами диапазона типа
-	public static UsedMethodsI PresentMethodsI { get; set; } = UsedMethodsI.CS1 | UsedMethodsI.HF1 | UsedMethodsI.LZ1 | UsedMethodsI.CS2 | UsedMethodsI.HF2 | UsedMethodsI.LZ2;
+	public static UsedMethodsI PresentMethodsI { get; set; } = UsedMethodsI.CS2 | UsedMethodsI.HF2 | UsedMethodsI.LZ2 | UsedMethodsI.AHF;
 }
 
 public static partial class DecodingI
 {
-	public static Image<Bgra32> Decode(byte[] compressedFile, out bool transparency)
+	public static Image<Rgba32> Decode(byte[] compressedFile, out bool transparency)
 	{
 		transparency = false;
 		if (compressedFile.Length <= 1)
 			return new(1, 1);
 		var encoding_version = compressedFile[0];
 		if (encoding_version == 0)
-			return Image.Load<Bgra32>(compressedFile.AsSpan(1));
+			return Image.Load<Rgba32>(compressedFile.AsSpan(1));
 		//else if (encoding_version < programVersion)
 		//	return Outdated.Decode(encoding_version, string_, form);
 		var method = compressedFile[1];
@@ -152,7 +152,7 @@ public static partial class DecodingI
 		}
 		if (hf >= 2)
 		{
-			compressedList = ar.DecodeAdaptive(lzData, lz, bwt, delta, skipped, counter);
+			compressedList = ar.DecodeAdaptive(lzData, rle, lz, bwt, delta, skipped, counter);
 			goto l1;
 		}
 		if (hf != 0)
@@ -221,12 +221,12 @@ public static partial class DecodingI
 		Current[0] += ProgressBarStep;
 		var colorsList = compressedList.DecodeTraversal(bestMethod, width, height);
 		Current[0] += ProgressBarStep;
-		Image<Bgra32> image = new(width, height);
+		Image<Rgba32> image = new(width, height);
 		colorsList.ForEach((x, index) => x.ForEach((y, index2) => image[index2, index] = new((byte)y[1].Lower, (byte)y[2].Lower, (byte)y[3].Lower, (byte)y[0].Lower)));
 		return image;
 	}
 
-	private static List<ShortIntervalList> DecodeAdaptive(this ArithmeticDecoder ar, LZData lzData, int lz, int bwt, int delta, NList<byte> skipped, int counter)
+	private static List<ShortIntervalList> DecodeAdaptive(this ArithmeticDecoder ar, LZData lzData, int rle, int lz, int bwt, int delta, NList<byte> skipped, int counter)
 	{
 		if (bwt != 0)
 		{
@@ -236,7 +236,7 @@ public static partial class DecodingI
 			counter -= (skippedCount + 9) / 8;
 		}
 		var leftSerie = 0;
-		List<int> values = [];
+		using NList<int> values = [];
 		if (bwt != 0)
 			counter = (int)ar.ReadCount();
 		uint fileBase = ar.ReadCount(), base2 = ar.ReadCount(), base3 = ar.ReadCount(), base4 = ar.ReadCount();
@@ -284,7 +284,7 @@ public static partial class DecodingI
 			if (!(lz != 0 && uniqueList[readItem].Item1.Lower == fileBase - 1))
 			{
 				ShortIntervalList list = [uniqueList[readItem].Item1, uniqueList[readItem].Item2, uniqueList[readItem].Item3, uniqueList[readItem].Item4];
-				if (leftSerie > 0)
+				if (rle == 0 || leftSerie > 0)
 				{
 					leftSerie--;
 					counter--;
@@ -319,6 +319,8 @@ public static partial class DecodingI
 						Status[0] += value;
 						values.Add(value);
 					}
+					if (counter < 0)
+						throw new DecoderFallbackException();
 				}
 				result.Add(list);
 				lzLength++;
@@ -389,11 +391,13 @@ public static partial class DecodingI
 			for (var i = fullLength; i > 0; i -= (int)length + 2)
 			{
 				var length2 = (int)Min(length + 2, i);
-				result.AddRange(result.GetRange(start, length2));
-				var valuesRange = values.GetRange(start, length2);
+				result.AddRange(result.GetSlice(start, length2));
+				var valuesRange = values.GetSlice(start, length2);
 				values.AddRange(valuesRange);
 				var decrease = valuesRange.Sum();
 				counter -= decrease;
+				if (counter < 0)
+					throw new DecoderFallbackException();
 				Status[0] += decrease;
 			}
 			if (leftSerie >= fullLength)
@@ -435,7 +439,7 @@ public static partial class DecodingI
 	{
 		var leftSerie = 0;
 		uint colorCount;
-		List<int> values = [];
+		using NList<int> values = [];
 		Status[0] = 0;
 		StatusMaximum[0] = counter;
 		List<ShortIntervalList> result = [];
@@ -513,13 +517,15 @@ public static partial class DecodingI
 				for (var i = fullLength; i > 0; i -= (int)length + 2)
 				{
 					var length2 = (int)Min(length + 2, i);
-					result.AddRange(result.GetRange(start, length2));
-					var valuesRange = values.GetRange(start, length2);
+					result.AddRange(result.GetSlice(start, length2));
+					var valuesRange = values.GetSlice(start, length2);
 					values.AddRange(valuesRange);
 					var decrease = valuesRange.Sum();
 					counter -= decrease;
 					Status[0] += decrease;
 				}
+				if (counter < 0)
+					throw new DecoderFallbackException();
 				if (leftSerie >= fullLength)
 					leftSerie -= fullLength;
 				else
@@ -591,6 +597,8 @@ public static partial class DecodingI
 						Status[0] += value;
 						values.Add(value);
 					}
+					if (counter < 0)
+						throw new DecoderFallbackException();
 					if (hf == 0 && (newSerie < ValuesInByte >> 1 || delta == 0))
 						deltaSum += (byte)((value - 1) * (list[0].Lower + (imageData.RAlpha == 2 ? ValuesInByte >> 1 : 1)) % (imageData.RAlpha == 2 ? ValuesInByte : imageData.RAlpha + 1));
 				}
@@ -626,7 +634,7 @@ public static partial class DecodingI
 
 	private static List<ShortIntervalList> DecodePPM(this ArithmeticDecoder ar)
 	{
-		var intervalList = new List<Interval>();
+		var intervalList = new NList<Interval>();
 		var (inputBase, base2, base3, base4) = (1u, (uint)ValuesInByte, (uint)ValuesInByte, (uint)ValuesInByte);
 		var (inputLength, LZDictionarySize) = ((int)ar.ReadCount(), (int)ar.ReadCount());
 		Status[0] = 0;
@@ -776,7 +784,7 @@ public static partial class DecodingI
 			input[i] = new((input[i][0].Lower + input[i - 1][0].Lower) % input[i][0].Base == input[i][0].Base / 2 && input[i][0].Base != 1 ? [new((input[i][0].Lower + input[i][0].Base / 2 + input[i - 1][0].Lower) % input[i][0].Base, input[i][0].Base), Interval.Default, Interval.Default, Interval.Default] : input[i].Convert((x, index) => new Interval((x.Lower + x.Base / 2 + input[i - 1][index].Lower) % x.Base, x.Base)));
 	}
 
-	private static List<List<ShortIntervalList>> DecodeTraversal(this List<ShortIntervalList> input, int bestMethod, int width, int height)
+	public static List<List<ShortIntervalList>> DecodeTraversal(this List<ShortIntervalList> input, int bestMethod, int width, int height)
 	{
 		switch (bestMethod)
 		{
@@ -836,14 +844,17 @@ public static partial class DecodingI
 				for (var i = 0; i < 4; i++)
 				{
 					if (length[i] <= 0)
-						continue;
+						break;
 					for (int j = start[i].Y, k = start[i].X, k2 = 0; k2 < length[i]; j += direction[i].Y, k += direction[i].X, k2++)
 						result2[j][k] = input[index++];
 					start[i] = (start[i].X + reduction[i].X, start[i].Y + reduction[i].Y);
 					length[i] -= 2;
 				}
 			}
-			if (index != input.Length)
+			if (length[0] > 0 && length[1] >= 0)
+				for (int j = start[0].Y, k = start[0].X, k2 = 0; k2 < length[0]; j += direction[0].Y, k += direction[0].X, k2++)
+					result2[j][k] = input[index++];
+			if (index != input.Length || index != result2.Length * result2[0].Length)
 				throw new DecoderFallbackException();
 			return result2;
 			default:
@@ -864,7 +875,7 @@ public static partial class DecodingI
 		return input;
 	}
 
-	private static Image<Bgra32> LWDecode(byte[] originalFile, int method)
+	private static Image<Rgba32> LWDecode(byte[] originalFile, int method)
 	{
 		ArithmeticDecoder ar = originalFile;
 		(var width, var height) = ar.DecodeWidthAndHeight();
@@ -875,7 +886,7 @@ public static partial class DecodingI
 	{
 		var height = (int)ar.ReadCount() + 1;
 		var width = (int)ar.ReadCount() + 1;
-		if (width is < 16 || height is < 16 || width * height > 0x300000)
+		if (width * height > 0x300000)
 			throw new DecoderFallbackException();
 		return (width, height);
 	}
