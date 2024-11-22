@@ -4,12 +4,11 @@ namespace AresILib;
 
 public static partial class ExecutionsI
 {
-	private const int LZDictionarySize = 32767;
 	private static ShortIntervalList widthAndHeightIntervals = [];
 
-	private static List<ShortIntervalList> Alpha(this List<ShortIntervalList> input)
+	private static NList<ShortIntervalList> Alpha(this NList<ShortIntervalList> input)
 	{
-		var input2 = input.GetSlice(2);
+		var input2 = input.GetRange(2);
 		var r = 0;
 		foreach (var list in input2)
 		{
@@ -38,7 +37,7 @@ public static partial class ExecutionsI
 		return input;
 	}
 
-	private static List<ShortIntervalList> Delta(this List<ShortIntervalList> input)
+	private static NList<ShortIntervalList> Delta(this NList<ShortIntervalList> input)
 	{
 		if (input.Length < 5)
 			return input;
@@ -54,7 +53,7 @@ public static partial class ExecutionsI
 		return input;
 	}
 
-	private static List<ShortIntervalList> UltraDelta(this List<ShortIntervalList> input)
+	private static NList<ShortIntervalList> UltraDelta(this NList<ShortIntervalList> input)
 	{
 		if (input.Length < 6)
 			return input;
@@ -71,9 +70,9 @@ public static partial class ExecutionsI
 		return input;
 	}
 
-	private static List<List<ShortIntervalList>> ToTripleList(this List<List<Rgba32>> input)
+	private static List<NList<ShortIntervalList>> ToTripleList(this List<List<Rgba32>> input)
 	{
-		List<List<ShortIntervalList>> result = new(input.Length + 1) { new() { new() { PixelsApplied }, new(widthAndHeightIntervals) { new(0, 36), new(0, 24) } } };
+		List<NList<ShortIntervalList>> result = new(input.Length + 1) { new() { new() { PixelsApplied }, new(widthAndHeightIntervals) { new(0, 36), new(0, 24) } } };
 		for (var i = 0; i < input.Length; i++)
 		{
 			result.Add(new(input[i].Length));
@@ -98,7 +97,7 @@ public static partial class ExecutionsI
 		return result;
 	}
 
-	public static List<List<ShortIntervalList>> Traverse(this List<List<ShortIntervalList>> input, TraversalMode mode)
+	public static List<NList<ShortIntervalList>> Traverse(this List<NList<ShortIntervalList>> input, TraversalMode mode)
 	{
 		if (mode == TraversalMode.Table)
 			return input;
@@ -107,7 +106,7 @@ public static partial class ExecutionsI
 		else if (mode == TraversalMode.Diagonal)
 		{
 			var input2 = input.GetSlice(1);
-			List<List<ShortIntervalList>> newList = [];
+			List<NList<ShortIntervalList>> newList = [];
 			for (var i = 0; i < input2.Length; i++)
 			{
 				newList.Add([]);
@@ -122,7 +121,7 @@ public static partial class ExecutionsI
 			}
 			newList.Insert(0, input[0]);
 #if DEBUG
-			var decoded = DecodingI.DecodeTraversal(newList.GetSlice(1).JoinIntoSingle().ToList(x => new ShortIntervalList(x)), 4, input2[0].Length, input2.Length);
+			var decoded = DecodingI.DecodeTraversal(newList.GetSlice(1).JoinIntoSingle().ToNList(x => new ShortIntervalList(x)), 4, input2[0].Length, input2.Length);
 			for (var i = 0; i < input2.Length && i < decoded.Length; i++)
 			{
 				for (var j = 0; j < input2[i].Length && j < decoded[i].Length; j++)
@@ -147,7 +146,7 @@ public static partial class ExecutionsI
 			var input2 = input.GetSlice(1);
 			if (input2.Length <= 1 || input2[0].Length <= 1)
 				return input;
-			List<List<ShortIntervalList>> newList = [];
+			List<NList<ShortIntervalList>> newList = [];
 			List<(int X, int Y)> start = [(0, 0), (input2[0].Length - 1, 1), (input2[0].Length - 2, input2.Length - 1), (0, input2.Length - 2)];
 			List<int> length = [input2[0].Length, input2.Length - 1, input2[0].Length - 1, input2.Length - 2];
 			List<(int X, int Y)> direction = [(1, 0), (0, 1), (-1, 0), (0, -1)];
@@ -173,7 +172,7 @@ public static partial class ExecutionsI
 			}
 			newList.Insert(0, input[0]);
 #if DEBUG
-			var decoded = DecodingI.DecodeTraversal(newList.GetSlice(1).JoinIntoSingle().ToList(x => new ShortIntervalList(x)), 8, input2[0].Length, input2.Length);
+			var decoded = DecodingI.DecodeTraversal(newList.GetSlice(1).JoinIntoSingle().ToNList(x => new ShortIntervalList(x)), 8, input2[0].Length, input2.Length);
 			for (var i = 0; i < input2.Length && i < decoded.Length; i++)
 			{
 				for (var j = 0; j < input2[i].Length && j < decoded[i].Length; j++)
@@ -192,7 +191,7 @@ public static partial class ExecutionsI
 			return input;
 	}
 
-	public static List<List<T>> Enline<T>(this List<List<T>> input)
+	public static List<NList<T>> Enline<T>(this List<NList<T>> input) where T : unmanaged
 	{
 		var rev = true;
 		foreach (var list in input.GetSlice(1))
@@ -203,17 +202,17 @@ public static partial class ExecutionsI
 		return input;
 	}
 
-	private static List<ShortIntervalList> RLE(this List<ShortIntervalList> input, int tn, bool cout = false)
+	private static NList<ShortIntervalList> RLE(this NList<ShortIntervalList> input, int tn, bool cout = false)
 	{
-		List<ShortIntervalList> result = new(input.Length);
+		NList<ShortIntervalList> result = new(input.Length);
 		int length = 1, startPos = 3;
 		result.AddRange(input.GetSlice(0, startPos));
-		List<ShortIntervalList> uniqueLists;
+		NList<ShortIntervalList> uniqueLists;
 		NList<int> indexCodes;
 		if (cout)
-			(uniqueLists, indexCodes) = input.GetSlice(startPos).Wrap(dl => (dl.RemoveDoubles(x => x[0]), dl.RepresentIntoNumbers((x, y) => x[0].Equals(y[0]), x => x[0].GetHashCode())));
+			(uniqueLists, indexCodes) = input.GetRange(startPos).Wrap(dl => (dl.RemoveDoubles(x => x[0]).ToNList(), dl.RepresentIntoNumbers((x, y) => x[0].Equals(y[0]), x => x[0].GetHashCode())));
 		else
-			(uniqueLists, indexCodes) = input.GetSlice(startPos).Wrap(dl => (dl.RemoveDoubles(x => (x[0], x[1], x[2], x[3])), dl.RepresentIntoNumbers((x, y) => x[0].Equals(y[0]) && x[1].Equals(y[1]) && x[2].Equals(y[2]) && x[3].Equals(y[3]), x => HashCode.Combine(x[0], x[1], x[2], x[3]))));
+			(uniqueLists, indexCodes) = input.GetRange(startPos).Wrap(dl => (dl.RemoveDoubles(x => (x[0], x[1], x[2], x[3])).ToNList(), dl.RepresentIntoNumbers((x, y) => x[0].Equals(y[0]) && x[1].Equals(y[1]) && x[2].Equals(y[2]) && x[3].Equals(y[3]), x => HashCode.Combine(x[0], x[1], x[2], x[3]))));
 		var prev = indexCodes[0];
 		var prevEqual = false;
 		var doNotReadEqual = false;
@@ -286,11 +285,11 @@ public static partial class ExecutionsI
 			}
 		}
 		result[1] = new(result[1]);
-		result[1][^1] = new(result[1][^1].Lower / 2 * 2 + 1, 24);
+		result[1].Set(^1, new(result[1][^1].Lower / 2 * 2 + 1, 24));
 		return result.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length))) < input.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length))) ? input.Replace(result) : input;
 	}
 
-	private static List<ShortIntervalList> Huffman(this List<ShortIntervalList> input, int tn, bool cout = false)
+	private static NList<ShortIntervalList> Huffman(this NList<ShortIntervalList> input, int tn, bool cout = false)
 	{
 		if (input.Length == 0)
 			return [];
@@ -299,7 +298,7 @@ public static partial class ExecutionsI
 			return input;
 		Current[tn] = 0;
 		CurrentMaximum[tn] = ProgressBarStep * 2;
-		List<ShortIntervalList> result = new(input);
+		NList<ShortIntervalList> result = new(input);
 		result[0] = new(result[0]);
 		var lz = CreateVar(input[0].IndexOf(LempelZivApplied), out var lzIndex) != -1 && (bwtIndex == -1 || lzIndex != bwtIndex + 1);
 		var lzDummy = CreateVar(input[0].IndexOf(LempelZivDummyApplied), out var lzDummyIndex) != -1 && (bwtIndex == -1 || lzDummyIndex != bwtIndex + 1);
@@ -313,7 +312,7 @@ public static partial class ExecutionsI
 		Status[tn] = 0;
 		StatusMaximum[tn] = 7;
 		var maxFrequency = 1;
-		var groups = input.GetSlice(startPos).ToNList((x, index) => (elem: lz && index >= 2 && x[0].Lower + x[0].Length == x[0].Base || cout || bwtIndex != -1 ? (x[0], Interval.Default, Interval.Default, Interval.Default) : (x[0], x[1], x[2], x[3]), index)).Wrap(l => lz ? l.FilterInPlace(x => x.index < 2 || x.elem.Item1.Lower + x.elem.Item1.Length != x.elem.Item1.Base) : l).Group(x => x.elem).Wrap(l => CreateVar(l.Max(x => x.Length), out maxFrequency) > input[startPos][0].Base * 2 || input[startPos][0].Base <= ValuesInByte ? l.NSort(x => 4294967295 - (uint)x.Length) : l);
+		var groups = input.GetRange(startPos).ToNList((x, index) => (elem: lz && index >= 2 && x[0].Lower + x[0].Length == x[0].Base || cout || bwtIndex != -1 ? (x[0], Interval.Default, Interval.Default, Interval.Default) : (x[0], x[1], x[2], x[3]), index)).Wrap(l => lz ? l.FilterInPlace(x => x.index < 2 || x.elem.Item1.Lower + x.elem.Item1.Length != x.elem.Item1.Base) : l).Group(x => x.elem).Wrap(l => CreateVar(l.Max(x => x.Length), out maxFrequency) > input[startPos][0].Base * 2 || input[startPos][0].Base <= ValuesInByte ? l.NSort(x => 4294967295 - (uint)x.Length) : l);
 		Status[tn]++;
 		var uniqueList = groups.PConvert(x => (new Interval(x[0].elem.Item1) { Base = input[startPos][0].Base }, x[0].elem.Item2, x[0].elem.Item3, x[0].elem.Item4));
 		Status[tn]++;
@@ -389,11 +388,11 @@ public static partial class ExecutionsI
 		result.Insert(startPos - bwtLength, cSplit.PConvert(x => new ShortIntervalList(x)));
 		cSplit.Dispose();
 		result[1] = new(result[1]);
-		result[1][^1] = new(result[1][^1].Lower / 8 * 8 + result[1][^1].Lower % 2 + 2, 24);
+		result[1].Set(^1, new(result[1][^1].Lower / 8 * 8 + result[1][^1].Lower % 2 + 2, 24));
 		return result.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length))) < input.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length))) ? input.Replace(result) : input;
 	}
 
-	private static List<ShortIntervalList> AdaptiveHuffman(this List<ShortIntervalList> input, LZData lzData, int tn, bool cout = false)
+	private static NList<ShortIntervalList> AdaptiveHuffman(this NList<ShortIntervalList> input, LZData lzData, int tn, bool cout = false)
 	{
 		if (input.Length < 2)
 			throw new EncoderFallbackException();
@@ -402,11 +401,11 @@ public static partial class ExecutionsI
 		return result;
 	}
 
-	private static List<ShortIntervalList> LempelZiv(this List<ShortIntervalList> input, out LZData lzData, int tn, bool cout = false)
+	private static NList<ShortIntervalList> LempelZiv(this NList<ShortIntervalList> input, out LZData lzData, int tn, bool cout = false)
 	{
-		var result = new LempelZiv(input, [], tn, cout).Encode(out lzData);
+		var result = new LempelZiv(input, [], tn, cout).Encode(out lzData).ToList();
 		result[1] = new(result[1]);
-		result[1][^1] = new(result[1][^1].Lower % 8 + 8, 24);
+		result[1].Set(^1, new(result[1][^1].Lower % 8 + 8, 24));
 		return result.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length))) < input.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length))) ? input.Replace(result) : input;
 	}
 
@@ -419,77 +418,84 @@ public static partial class ExecutionsI
 		return Sqrt(sum / list.Length());
 	}
 
-	private static void Encode1(List<List<Rgba32>> input, int n, ref byte[] cs, out List<ShortIntervalList> cdl, int tn)
+	private static void Encode1(List<List<Rgba32>> input, int n, ref NList<byte> cs, out NList<ShortIntervalList> cdl, int tn)
 	{
 		const int methodsCount = 9;
 		var tl = input.ToTripleList();
-		var sum = tl.Sum(dl => dl.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length)))) / Log(256);
-		cdl = default!;
-		bool hf = PresentMethodsI.HasFlag(tn switch { 0 => UsedMethodsI.HF1, 1 => UsedMethodsI.HF2, 2 => UsedMethodsI.CS3, 3 => UsedMethodsI.CS4, _ => throw new EncoderFallbackException() }), bwt = n >= 2, lz = PresentMethodsI.HasFlag(tn switch { 0 => UsedMethodsI.LZ1, 1 => UsedMethodsI.LZ2, 2 => UsedMethodsI.LZ3, 3 => UsedMethodsI.LZ4, _ => throw new EncoderFallbackException() }) && !bwt;
+		var sum = tl.Sum(dl => dl.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length)))) / Log(ValuesInByte);
+		var cdl2 = cdl = default!;
+		bool hf = PresentMethodsI.HasFlag(tn switch { 0 => UsedMethodsI.HF1, 1 => UsedMethodsI.HF2, 2 => UsedMethodsI.CS3, 3 => UsedMethodsI.CS4, _ => throw new EncoderFallbackException() }),
+			bwt = n >= 2, lz = PresentMethodsI.HasFlag(tn switch { 0 => UsedMethodsI.LZ1, 1 => UsedMethodsI.LZ2, 2 => UsedMethodsI.LZ3, 3 => UsedMethodsI.LZ4, _ => throw new EncoderFallbackException() }) && !bwt;
+		object lockObj = new();
 		Subtotal[tn] = 0;
 		SubtotalMaximum[tn] = ProgressBarStep * methodsCount * 3;
 		for (var tlIndex = 0; tlIndex < 1; tlIndex++)
 		{
-			for (var i = 0; i < methodsCount; i++)
+			if (Threads.Count(x => x != null && x.ThreadState is System.Threading.ThreadState.Running or System.Threading.ThreadState.Background) == 1)
+				Parallel.For(0, methodsCount, i => PerformIteration(i, i));
+			else
+				for (var i = 0; i < methodsCount; i++)
+					PerformIteration(i, tn);
+		}
+		cdl = cdl2;
+		cs = WorkUpDoubleList((cdl ?? tl.JoinIntoSingle().ToNList()), tn);
+		void PerformIteration(int i, int tn)
+		{
+			Current[tn] = 0;
+			CurrentMaximum[tn] = ProgressBarStep * 6;
+			GC.Collect();
+			var tl1 = tl.ToList(dl => dl.ToNList(l => new ShortIntervalList(l)));
+			tl1[0][1].Set(^2, new((uint)(n * methodsCount + i), methodsCount << 2));
+			var traversedList = tl1.Traverse((TraversalMode)(i / 2));
+			Current[tn] += ProgressBarStep;
+			if (i % 2 == 1)
+				traversedList.Enline();
+			Current[tn] += ProgressBarStep;
+			var dl1 = traversedList.JoinIntoSingle().ToNList().Wrap(x => n < 4 ? x.Alpha() : x);
+			Current[tn] += ProgressBarStep;
+			if (n % 2 == 1)
+				dl1.Delta();
+			Current[tn] += ProgressBarStep;
+			Current[tn] += ProgressBarStep;
+			dl1.RLE(tn, n >= 4);
+			Current[tn] += ProgressBarStep;
+			Subtotal[tn] += ProgressBarStep;
+			if (bwt)
 			{
-				Current[tn] = 0;
-				CurrentMaximum[tn] = ProgressBarStep * 6;
-				GC.Collect();
-				var tl1 = tl.ToList(dl => dl.ToList(l => new ShortIntervalList(l)));
-				tl1[0][1][^2] = new((uint)(n * methodsCount + i), methodsCount << 2);
-				var traversedList = tl1.Traverse((TraversalMode)(i / 2));
-				Current[tn] += ProgressBarStep;
-				if (i % 2 == 1)
-					traversedList.Enline();
-				Current[tn] += ProgressBarStep;
-				var dl1 = traversedList.JoinIntoSingle().Wrap(x => n < 4 ? x.Alpha() : x);
-				Current[tn] += ProgressBarStep;
-				if (n % 2 == 1)
-					dl1.Delta();
-				Current[tn] += ProgressBarStep;
-				Current[tn] += ProgressBarStep;
-				dl1.RLE(tn, n >= 4);
-				Current[tn] += ProgressBarStep;
+				var enoughTransparency = dl1.GetRange(3).Count(l => l[1].Base == 1 && l[2].Base == 1 && l[3].Base == 1) >= dl1.Length * 0.03;
+				dl1[2].Add(new(enoughTransparency ? 1u : 0, 2));
+				dl1 = new BWTI(tn).Encode(dl1.GetSlice(0, 3).Concat(dl1.GetRange(3).ConvertAndJoin(l => (dl1[2][0].Lower == 0 ? l.GetSlice(1) : enoughTransparency && l[1].Base == 1 && l[2].Base == 1 && l[3].Base == 1 ? l.GetSlice(4).Prepend(l[0]) : l.GetSlice()).Convert(x => new ShortIntervalList([new(x.Lower, x.Length, ValuesInByte)])))).ToNList(), (int)(dl1[1][^2].Lower / methodsCount % 2), enoughTransparency);
+			}
+			if ((PresentMethodsI & UsedMethodsI.AHF) != 0)
+			{
+				LZData lzData = new();
+				if (lz) dl1.LempelZiv(out lzData, tn, n >= 4);
 				Subtotal[tn] += ProgressBarStep;
-				if (bwt)
-				{
-					var enoughTransparency = dl1.GetSlice(3).Count(l => l[1].Base == 1 && l[2].Base == 1 && l[3].Base == 1) >= dl1.Length * 0.03;
-					dl1[2].Add(new(enoughTransparency ? 1u : 0, 2));
-					dl1 = new BWT(tn).Encode(dl1.GetSlice(0, 3).Concat(dl1.GetSlice(3).ConvertAndJoin(l => (dl1[2][0].Lower == 0 ? l.GetSlice(1) : enoughTransparency && l[1].Base == 1 && l[2].Base == 1 && l[3].Base == 1 ? l.GetSlice(4).Prepend(l[0]) : l.GetSlice()).Convert(x => new ShortIntervalList([new(x.Lower, x.Length, ValuesInByte)])))), (int)(dl1[1][^2].Lower / methodsCount % 2), enoughTransparency);
-				}
-				//var s2 = WorkUpDoubleList(PPM(dl1, tn, n >= 4), tn);
-				//ctl[tlIndex] = dl1;
-				if ((PresentMethodsI & UsedMethodsI.AHF) != 0)
-				{
-					LZData lzData = new();
-					if (lz) dl1.LempelZiv(out lzData, tn, n >= 4);
-					Subtotal[tn] += ProgressBarStep;
-					if (hf) dl1.AdaptiveHuffman(lzData, tn, n >= 4);
-				}
-				else
-				{
-					if (hf) dl1.Huffman(tn, n >= 4);
-					Subtotal[tn] += ProgressBarStep;
-					if (lz) dl1.LempelZiv(out var lzData, tn, n >= 4);
-				}
-				var s1 = dl1.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length))) / Log(256);
+				if (hf) dl1.AdaptiveHuffman(lzData, tn, n >= 4);
+			}
+			else
+			{
+				if (hf) dl1.Huffman(tn, n >= 4);
+				Subtotal[tn] += ProgressBarStep;
+				if (lz) dl1.LempelZiv(out var lzData, tn, n >= 4);
+			}
+			var s1 = dl1.Sum(l => l.Sum(x => Log(x.Base) - Log(x.Length))) / Log(ValuesInByte);
+			lock (lockObj)
 				if (s1 > 0 && (s1 < sum || sum == 0))
 				{
-					cdl = dl1;
+					cdl2 = dl1;
 					sum = s1;
 				}
-				Subtotal[tn] += ProgressBarStep;
-			}
+			Subtotal[tn] += ProgressBarStep;
 		}
-		cs = WorkUpDoubleList(cdl ?? tl.JoinIntoSingle(), tn);
 	}
 
-	public static byte[] Encode(Image<Rgba32> originalImage, byte[] originalBytes, out List<ShortIntervalList> intervals)
+	public static byte[] Encode(Image<Rgba32> originalImage, NList<byte> originalBytes, out NList<ShortIntervalList> intervals)
 	{
 		var s = RedStarLinq.FillArray(ProgressBarGroups, _ => originalBytes);
 		var cs = originalBytes;
-		var tl = RedStarLinq.FillArray(ProgressBarGroups, _ => (List<ShortIntervalList>)default!);
-		int lw = 0, part = 0, lwP5 = 0;
+		var tl = RedStarLinq.FillArray(ProgressBarGroups, _ => (NList<ShortIntervalList>)default!);
+		int lw = 0, part = 0;
 		List<List<Rgba32>> input = [];
 		Total = 0;
 		TotalMaximum = ProgressBarStep * 6;
@@ -571,23 +577,8 @@ public static partial class ExecutionsI
 		Thread.CurrentThread.Priority = ThreadPriority.Lowest;
 		Threads.ForEach(x => x?.Start());
 		Threads.ForEach(x => x?.Join());
-		//if ((PresentMethods & UsedMethods.CS7) != 0 && s[6].Length < cs.Length && s[6].Length > 0 && s.GetSlice(0, 6).All(x => s[6].Length < x.Length))
-		//{
-		//	cs = s[6];
-		//}
-		//else if ((PresentMethods & UsedMethods.CS6) != 0 && s[5].Length < cs.Length && s[5].Length > 0 && s.GetSlice(0, 5).All(x => s[5].Length < x.Length))
-		//{
-		//	cs = s[5];
-		//}
 		var bestIndex = s.Prepend(cs).IndexOfMin(x => CreateVar(x.Length, out var sum) == 0 ? double.PositiveInfinity : sum) - 1;
-		if ((PresentMethodsI & UsedMethodsI.CS6) != 0 && bestIndex == 4)
-		{
-			lw = lwP5;
-			part = 8;
-			cs = s[4];
-			intervals = tl[4];
-		}
-		else if ((PresentMethodsI & UsedMethodsI.CS4) != 0 && bestIndex == 3)
+		if ((PresentMethodsI & UsedMethodsI.CS4) != 0 && bestIndex == 3)
 		{
 			part = 0;
 			cs = s[3];
@@ -613,10 +604,10 @@ public static partial class ExecutionsI
 		}
 		else
 		{
-			intervals = originalBytes.ToList(x => ByteIntervals[x]);
+			intervals = originalBytes.ToNList(x => ByteIntervals[x]);
 			return [0, .. originalBytes];
 		}
-		var compressedFile = new byte[] { ProgramVersion, (byte)(lw + part) }.Concat(cs).ToArray();
+		var compressedFile = new[] { ProgramVersion, (byte)(lw + part) }.Concat(cs).ToArray();
 #if DEBUG
 		try
 		{
@@ -633,5 +624,5 @@ public static partial class ExecutionsI
 		return compressedFile;
 	}
 
-	public static byte[] Encode(Image<Rgba32> originalImage, byte[] originalBytes) => Encode(originalImage, originalBytes, out _);
+	public static byte[] Encode(Image<Rgba32> originalImage, NList<byte> originalBytes) => Encode(originalImage, originalBytes, out _);
 }

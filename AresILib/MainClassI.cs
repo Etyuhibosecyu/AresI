@@ -1,10 +1,6 @@
-﻿using System.Collections;
-using System.Diagnostics;
-using System.Drawing;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using static System.Math;
 
 namespace AresILib;
 
@@ -14,8 +10,6 @@ public class MainClassI
 	private static NetworkStream? netStream;
 	private static byte[] toSend = [];
 	private static Thread? thread;
-	private static FileStream rfs = default!;
-	private static FileStream wfs = default!;
 	private static bool isWorking, transparency = false;
 	private static readonly object lockObj = new();
 
@@ -81,14 +75,14 @@ public class MainClassI
 
 	public static void ReceiveData()
 	{
-		var receiveLen = new byte[4];
+		var receiveLen = GC.AllocateUninitializedArray<byte>(4);
 		byte[] receiveMessage;
 		while (true)
 		{
 			try
 			{
 				netStream?.Read(receiveLen, 0, 4);//чтение сообщения
-				receiveMessage = new byte[BitConverter.ToInt32(receiveLen)];
+				receiveMessage = GC.AllocateUninitializedArray<byte>(BitConverter.ToInt32(receiveLen));
 				netStream?.Read(receiveMessage, 0, receiveMessage.Length);
 				WorkUpReceiveMessage(receiveMessage);
 			}
@@ -111,9 +105,9 @@ public class MainClassI
 				var filename = Encoding.UTF8.GetString(message[1..]);
 				thread = new((message[0] - 2) switch
 				{
-					0 => () => MainThread(filename, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress),
+					0 => () => MainThread(filename, (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + "/" + Path.GetFileNameWithoutExtension(filename), Decompress),
 					1 => () => MainThread(filename, Path.ChangeExtension(filename, ".ares-i"), Compress),
-					2 => () => MainThread(filename, Path.GetDirectoryName(filename) + @"\" + Path.GetFileNameWithoutExtension(filename), Decompress),
+					2 => () => MainThread(filename, Path.GetDirectoryName(filename) + "/" + Path.GetFileNameWithoutExtension(filename), Decompress),
 					3 => () => MainThread(filename, filename, Recompress),
 					_ => () => { }
 					,
@@ -135,7 +129,7 @@ public class MainClassI
 		}
 	}
 
-	public static void MainThread(string filename, string filename2, Action<FileStream, FileStream> action, bool send = true)
+	public static void MainThread(string filename, string filename2, Action<string, string> action, bool send = true)
 	{
 		var tempFilename = "";
 		try
@@ -144,12 +138,8 @@ public class MainClassI
 			isWorking = true;
 			//if (action == Compress)
 			//	fragment_count = (int)Max(Min((new FileInfo(filename).Length + fragmentLength - 1) / fragmentLength, int.MaxValue / 10), 1);
-			rfs = File.OpenRead(filename);
-			tempFilename = (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + @"\AresI-" + Environment.ProcessId + ".tmp";
-			wfs = File.OpenWrite(tempFilename);
-			action(rfs, wfs);
-			rfs.Close();
-			wfs.Close();
+			tempFilename = (Environment.GetEnvironmentVariable("temp") ?? throw new IOException()) + "/Ares-" + Environment.ProcessId + ".tmp";
+			action(filename, tempFilename);
 			File.Move(tempFilename, filename2 + (action != Decompress ? "" : transparency ? ".tga" : ".bmp"), true);
 			lock (lockObj)
 			{
@@ -187,8 +177,6 @@ public class MainClassI
 		{
 			if (File.Exists(tempFilename))
 			{
-				rfs.Close();
-				wfs.Close();
 				File.Delete(tempFilename);
 			}
 		}
@@ -229,142 +217,25 @@ public class MainClassI
 		Environment.Exit(0); //завершение процесса
 	}
 
-	public static void Compress(FileStream rfs, FileStream wfs)
+	public static void Compress(string rfile, string wfile)
 	{
-		using var image = Image.Load<Rgba32>(rfs);
-		var bytes = new byte[rfs.Length];
-		rfs.Position = 0;
-		rfs.Read(bytes);
+		using var image = Image.Load<Rgba32>(rfile);
+		var bytes = File.ReadAllBytes(rfile).ToNList();
 		var s = ExecutionsI.Encode(image, bytes);
-		wfs.Write(s);
-		//if (continue_)
-		//{
-		//	Supertotal = 0;
-		//	SupertotalMaximum = fragment_count * 10;
-		//	rfs_position = 0;
-		//	wfs_position = 0;
-		//	int fragment_count2 = fragment_count;
-		//	BitArray bits = new(0);
-		//	int i;
-		//	for (i = fibonacciSequence.Length - 1; i >= 0; i--)
-		//	{
-		//		if (fibonacciSequence[i] <= fragment_count2)
-		//		{
-		//			bits = new BitArray(i + 2);
-		//			bits[i] = true;
-		//			bits[i + 1] = true;
-		//			fragment_count2 -= fibonacciSequence[i];
-		//			break;
-		//		}
-		//	}
-		//	for (i--; i >= 0;)
-		//	{
-		//		if (fibonacciSequence[i] <= fragment_count2)
-		//		{
-		//			bits[i] = true;
-		//			fragment_count2 -= fibonacciSequence[i];
-		//			i -= 2;
-		//		}
-		//		else
-		//			i--;
-		//	}
-		//	bytes = new byte[(bits.Length + 7) / 8];
-		//	bits.CopyTo(bytes, 0);
-		//	wfs.Write(bytes, 0, bytes.Length);
-		//}
-		//rfs_position = rfs.Position;
-		//wfs_position = wfs.Position;
-		//if (fragment_count != 1)
-		//	bytes = new byte[fragmentLength];
-		//for (; fragment_count > 0; fragment_count--)
-		//{
-		//	if (fragment_count == 1)
-		//	{
-		//		int left_length = (int)(rfs.Length % fragmentLength);
-		//		if (left_length != 0)
-		//			bytes = new byte[left_length];
-		//	}
-		//	rfs.Read(bytes, 0, bytes.Length);
-		//	byte[] s = Executions.Encode(bytes);
-		//	if (fragment_count != 1)
-		//		wfs.Write(new byte[] { (byte)(s.Length / ValuesIn2Bytes), (byte)(s.Length % ValuesIn2Bytes >> BitsPerByte), (byte)s.Length }, 0, 3);
-		//	wfs.Write(s, 0, s.Length);
-		//	rfs_position = rfs.Position;
-		//	wfs_position = wfs.Position;
-		//	Supertotal += ProgressBarStep;
-		//	GC.Collect();
-		//}
+		File.WriteAllBytes(wfile, s);
 	}
 
-	public static void Decompress(FileStream rfs, FileStream wfs)
+	public static void Decompress(string rfile, string wfile)
 	{
-		var bytes = new byte[rfs.Length];
-		rfs.Read(bytes);
+		var bytes = File.ReadAllBytes(rfile);
 		using var image = DecodingI.Decode(bytes, out transparency);
 		if (transparency)
-			image.SaveAsTga(wfs, new() { BitsPerPixel = SixLabors.ImageSharp.Formats.Tga.TgaBitsPerPixel.Pixel32, Compression = SixLabors.ImageSharp.Formats.Tga.TgaCompression.None });
+			image.SaveAsTga(wfile, new() { BitsPerPixel = SixLabors.ImageSharp.Formats.Tga.TgaBitsPerPixel.Pixel32, Compression = SixLabors.ImageSharp.Formats.Tga.TgaCompression.None });
 		else
-			image.SaveAsBmp(wfs);
-		//if (continue_)
-		//{
-		//	rfs_position = 0;
-		//	wfs_position = 0;
-		//	fragment_count = 0;
-		//	BitArray bits;
-		//	bytes = new byte[1];
-		//	bool one = false, success = false;
-		//	int sequencePos = 0;
-		//	while (1 == 1)
-		//	{
-		//		rfs.Read(bytes, 0, 1);
-		//		bits = new BitArray(bytes);
-		//		for (int i = 0; i < bits.Length; i++)
-		//		{
-		//			if ((bits[i] && one) || sequencePos == fibonacciSequence.Length)
-		//			{
-		//				success = true;
-		//				break;
-		//			}
-		//			else
-		//			{
-		//				if (bits[i])
-		//					fragment_count += fibonacciSequence[sequencePos];
-		//				sequencePos++;
-		//				one = bits[i];
-		//			}
-		//		}
-		//		if (success)
-		//			break;
-		//	}
-		//	SupertotalMaximum = fragment_count * 10;
-		//}
-		//rfs_position = rfs.Position;
-		//wfs_position = wfs.Position;
-		//for (; fragment_count > 0; fragment_count--)
-		//{
-		//	if (fragment_count == 1)
-		//	{
-		//		bytes = new byte[Min(rfs.Length - rfs.Position, 8000002)];
-		//		rfs.Read(bytes, 0, bytes.Length);
-		//	}
-		//	else
-		//	{
-		//		bytes = new byte[3];
-		//		rfs.Read(bytes, 0, 3);
-		//		int fragment_length = Min((bytes[0] << (BitsPerByte << 1)) + (bytes[1] << BitsPerByte) + bytes[2], 8000002);
-		//		bytes = new byte[fragment_length];
-		//		rfs.Read(bytes, 0, bytes.Length);
-		//	}
-		//	byte[] s = Executions.Decode(bytes);
-		//	wfs.Write(s, 0, s.Length);
-		//	rfs_position = rfs.Position;
-		//	wfs_position = wfs.Position;
-		//	Supertotal += ProgressBarStep;
-		//	GC.Collect();
-		//}
+			image.SaveAsBmp(wfile);
 	}
 
-	private static void Recompress(FileStream rfs, FileStream wfs)
+	private static void Recompress(string rfile, string wfile)
 	{
 	}
 }

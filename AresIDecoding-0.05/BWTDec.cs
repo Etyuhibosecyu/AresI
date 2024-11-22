@@ -1,43 +1,44 @@
 ﻿
 namespace AresILib;
 
-public class BWTDec(List<ShortIntervalList> input, uint rAlpha, int delta, bool enoughTransparency)
+public class BWTDec(NList<ShortIntervalList> input, uint rAlpha, int delta, bool enoughTransparency, int bwtBlockSize)
 {
 	protected ShortIntervalList list = [];
 	protected byte newSerie, newSerieQ, deltaSum;
 	protected int leftSerie;
 
-	public virtual List<ShortIntervalList> Decode(NList<byte> skipped)
+	public virtual NList<ShortIntervalList> Decode(NList<byte> skipped)
 	{
+		var bwtBlockExtraSize = bwtBlockSize <= 0x4000 ? 2 : bwtBlockSize <= 0x400000 ? 3 : bwtBlockSize <= 0x40000000 ? 4 : 5;
 		Status[0] = 0;
-		StatusMaximum[0] = GetArrayLength(input.Length, BWTBlockSize + BWTBlockExtraSize);
-		var bytes = input.Convert(x => (byte)x[0].Lower);
+		StatusMaximum[0] = GetArrayLength(input.Length, bwtBlockSize + bwtBlockExtraSize);
+		var numericInput = input.Convert(x => (short)x[0].Lower);
 		NList<byte> bytes2 = [];
-		for (var i = 0; i < bytes.Length;)
+		for (var i = 0; i < numericInput.Length;)
 		{
-			int zle = bytes[i] & ValuesInByte >> 1, rle = bytes[i] & ValuesInByte >> 2;
-			bytes2.AddRange(bytes.GetSlice(i..(i += BWTBlockExtraSize)));
-			bytes2.AddRange(rle != 0 ? DecodeRLEAfterBWT(bytes, ref i) : zle != 0 ? DecodeZLE(bytes, ref i) : bytes.GetRange(i..Min(i += BWTBlockSize, bytes.Length)));
+			int zle = numericInput[i] & ValuesInByte >> 1, rle = numericInput[i] & ValuesInByte >> 2;
+			bytes2.AddRange(numericInput.GetSlice(i..(i += bwtBlockExtraSize)).Convert(x => (byte)x));
+			bytes2.AddRange(rle != 0 ? DecodeRLEAfterBWT(numericInput.Convert(x => (byte)x), ref i) : zle != 0 ? DecodeZLE(numericInput, ref i) : numericInput.GetRange(i..Min(i += bwtBlockSize, numericInput.Length)).Convert(x => (byte)x));
 		}
-		var hs = bytes2.Filter((x, index) => index % (BWTBlockSize + BWTBlockExtraSize) >= BWTBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
-		List<ShortIntervalList> result = new(bytes2.Length);
+		var hs = bytes2.Filter((x, index) => index % (bwtBlockSize + bwtBlockExtraSize) >= bwtBlockExtraSize).ToHashSet().Concat(skipped).Sort().ToHashSet();
+		NList<ShortIntervalList> result = new(bytes2.Length);
 		list.Clear();
 		leftSerie = newSerie = newSerieQ = deltaSum = 0;
-		for (var i = 0; i < bytes2.Length; i += BWTBlockSize, Status[0]++)
+		for (var i = 0; i < bytes2.Length; i += bwtBlockSize, Status[0]++)
 		{
-			if (bytes2.Length - i <= BWTBlockExtraSize)
+			if (bytes2.Length - i <= bwtBlockExtraSize)
 				throw new DecoderFallbackException();
-			var length = Min(BWTBlockSize, bytes2.Length - i - BWTBlockExtraSize);
+			var length = Min(bwtBlockSize, bytes2.Length - i - bwtBlockExtraSize);
 			bytes2[i] &= (ValuesInByte >> 2) - 1;
-			var firstPermutation = (int)bytes2.GetSlice(i, BWTBlockExtraSize).Progression(0L, (x, y) => unchecked((x << BitsPerByte) + y));
-			i += BWTBlockExtraSize;
+			var firstPermutation = (int)bytes2.GetSlice(i, bwtBlockExtraSize).Progression(0L, (x, y) => unchecked((x << BitsPerByte) + y));
+			i += bwtBlockExtraSize;
 			result.AddRange(DecodeBWT2(bytes2.GetRange(i, length), hs, firstPermutation));
 		}
 		result.Add(list);
 		return result;
 	}
 
-	protected virtual List<ShortIntervalList> DecodeBWT2(NList<byte> input, ListHashSet<byte> hs, int firstPermutation)
+	protected virtual NList<ShortIntervalList> DecodeBWT2(NList<byte> input, ListHashSet<byte> hs, int firstPermutation)
 	{
 		var mtfMemory = hs.ToArray();
 		for (var i = 0; i < input.Length; i++)
@@ -50,7 +51,7 @@ public class BWTDec(List<ShortIntervalList> input, uint rAlpha, int delta, bool 
 		var sorted = input.ToArray((elem, index) => (elem, index)).NSort(x => x.elem);
 		var convert = sorted.ToArray(x => x.index);
 		List<int> values = [];
-		var result = new List<ShortIntervalList>(input.Length / 3);
+		var result = new NList<ShortIntervalList>(input.Length / 3);
 		var it = firstPermutation;
 		for (var i = 0; i < input.Length;)
 		{
@@ -157,7 +158,7 @@ public class BWTDec(List<ShortIntervalList> input, uint rAlpha, int delta, bool 
 		return result;
 	}
 
-	public static NList<byte> DecodeRLEAfterBWT(Slice<byte> byteList, ref int i)
+	public NList<byte> DecodeRLEAfterBWT(Slice<byte> byteList, ref int i)
 	{
 		if (i >= byteList.Length)
 			throw new DecoderFallbackException();
@@ -165,10 +166,10 @@ public class BWTDec(List<ShortIntervalList> input, uint rAlpha, int delta, bool 
 		NList<byte> result = [];
 		int length, serie, l;
 		byte temp;
-		for (; i < byteList.Length && result.Length < BWTBlockSize;)
+		for (; i < byteList.Length && result.Length < bwtBlockSize;)
 		{
 			result.Add(byteList[i++]);
-			if (i >= byteList.Length || result.Length >= BWTBlockSize)
+			if (i >= byteList.Length || result.Length >= bwtBlockSize)
 				break;
 			temp = byteList[i++];
 			if (temp >= ValuesInByte >> 1)
@@ -179,11 +180,11 @@ public class BWTDec(List<ShortIntervalList> input, uint rAlpha, int delta, bool 
 				length = temp % (ValuesInByte >> 1) + 1;
 			else
 			{
-				if (i >= byteList.Length - 1 || result.Length >= BWTBlockSize - 1)
+				if (i >= byteList.Length - 1 || result.Length >= bwtBlockSize - 1)
 					break;
 				length = (byteList[i++] << BitsPerByte) + byteList[i++] + (ValuesInByte >> 1);
 			}
-			if (result.Length + length > BWTBlockSize)
+			if (result.Length + length > bwtBlockSize)
 				throw new DecoderFallbackException();
 			if (serie == 1)
 			{
@@ -196,7 +197,7 @@ public class BWTDec(List<ShortIntervalList> input, uint rAlpha, int delta, bool 
 			i += l;
 			if (l >= ValuesIn2Bytes)
 				continue;
-			if (i >= byteList.Length || result.Length >= BWTBlockSize)
+			if (i >= byteList.Length || result.Length >= bwtBlockSize)
 				break;
 			temp = byteList[i++];
 			if (temp >= ValuesInByte >> 1)
@@ -205,11 +206,11 @@ public class BWTDec(List<ShortIntervalList> input, uint rAlpha, int delta, bool 
 				length = temp % (ValuesInByte >> 1) + 1;
 			else
 			{
-				if (i >= byteList.Length - 1 || result.Length >= BWTBlockSize - 1)
+				if (i >= byteList.Length - 1 || result.Length >= bwtBlockSize - 1)
 					break;
 				length = (byteList[i++] << BitsPerByte) + byteList[i++] + (ValuesInByte >> 1);
 			}
-			if (result.Length + length > BWTBlockSize)
+			if (result.Length + length > bwtBlockSize)
 				throw new DecoderFallbackException();
 			for (var j = 0; j < length; j++)
 				result.Add(zero);
@@ -217,28 +218,29 @@ public class BWTDec(List<ShortIntervalList> input, uint rAlpha, int delta, bool 
 		return result;
 	}
 
-	public static NList<byte> DecodeZLE(Slice<byte> byteList, ref int i)
+	public virtual NList<byte> DecodeZLE(Slice<short> byteList, ref int i)
 	{
 		if (i >= byteList.Length)
 			throw new DecoderFallbackException();
-		byte zero = byteList[i++], zeroB = byteList[i++];
-		NList<byte> result = [];
+		short zero = byteList[i++], zeroB = byteList[i++];
+		NList<byte> result = new(bwtBlockSize);
 		String zeroCode = ['1'];
 		int length;
-		for (; i < byteList.Length && result.Length < BWTBlockSize;)
+		for (; i < byteList.Length && result.Length < bwtBlockSize;)
 		{
-			while (i < byteList.Length && result.Length < BWTBlockSize && byteList[i] != zero && byteList[i] != zeroB)
-				result.Add(byteList[i++]);
-			if (i >= byteList.Length || result.Length >= BWTBlockSize)
+			while (i < byteList.Length && result.Length < bwtBlockSize && byteList[i] != zero && byteList[i] != zeroB)
+				result.Add((byte)byteList[i++]);
+			if (i >= byteList.Length || result.Length >= bwtBlockSize)
 				break;
 			zeroCode.Remove(1);
 			length = 0;
-			while (i < byteList.Length && result.Length + length < BWTBlockSize && (byteList[i] == zero || byteList[i] == zeroB))
+			while (i < byteList.Length && result.Length + length < bwtBlockSize && (byteList[i] == zero || byteList[i] == zeroB))
 			{
 				zeroCode.Add(byteList[i++] == zero ? '0' : '1');
 				length = (int)(new MpzT(zeroCode.ToString(), 2) - 1);
 			}
-			result.AddRange(RedStarLinq.NFill(zero, length));
+			using var streamOfZeros = RedStarLinq.NFill((byte)zero, length);
+			result.AddRange(streamOfZeros);
 		}
 		return result;
 	}
